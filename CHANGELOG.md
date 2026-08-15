@@ -165,6 +165,12 @@
 
 
 
+
+## 打磨轮 6：字符画图 → Mermaid（真实渲染）
+- 6 处字符画图全部替换为 Mermaid：2 张 sequenceDiagram（run_code 全链路 / 科研任务时序）+ 4 张 flowchart（Agent 循环 / 双平面 / 塌缩豁免 / 三层架构）
+- 语法验证：mermaid.ink 真实渲染 6/6 通过（注意：需 base64url 编码，标准 base64 含 / 会 404）
+- Pages 注入：cayman 官方扩展点 _includes/head-custom.html 加载 mermaid@11（首次误用 layout 覆盖导致构建失败，已修复）
+- GitHub 仓库视图原生渲染 mermaid；Pages 浏览器端渲染 SVG
 ## 打磨轮 5：最终校对（配比调整交付）
 - 自动化检查：练习编号连续（1.1-1.3）、章节编号完整（各篇 1-7/1-10/4.0-4.9）、检验/小结齐备、PTC 术语一致、README 配比说明与三遍读法在位
 - 渲染抽查：5.5.1 时序图、4.2 要点均正常
