@@ -1,0 +1,4 @@
+# GitHub Pages 配置（Jekyll 自动渲染 markdown）
+title: "从零到一：Agent 开发实战博客系列"
+description: "从 LLM 原理到 DeepSeek Harness（DSH）项目实战——做出你自己的科研 Agent（前后端分离 + Ubuntu 部署）"
+theme: jekyll-theme-cayman
