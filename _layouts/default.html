@@ -1,0 +1,18 @@
+---
+---
+{% include head.html %}
+<body>
+  {% include header.html %}
+  <main id="content" class="main-content" role="main">
+    {{ content }}
+  </main>
+  {% include footer.html %}
+  <!-- Mermaid 时序图/流程图渲染（CDN） -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <script>
+    if (window.mermaid) {
+      mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    }
+  </script>
+</body>
+</html>

@@ -7,24 +7,17 @@
 
 ## 4.0 项目总览：三层架构（前后端分离的骨架）
 
-```text
-┌─────────────────────────────────────────────┐
-│ 前端层（任何机器可访问）                      │
-│  Web 面板：任务创建/结果/日志流 —— 只调后端 API │
-└───────────────┬─────────────────────────────┘
-                │ REST + WebSocket（Bearer token）
-┌───────────────▼─────────────────────────────┐
-│ 后端层（Ubuntu 主机）                        │
-│  API 服务（FastAPI）                        │
-│   ├─ 任务注册表（持久化）/鉴权/日志流         │
-│   └─ spawn dsh --profile <P> "任务"          │
-└───────────────┬─────────────────────────────┘
-                │
-┌───────────────▼─────────────────────────────┐
-│ Agent 核心（DSH headless）                   │
-│  AutoResearcher 预设 + 科研工具插件           │
-│  沙箱/审批/预算账本/审计                      │
-└─────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph FE[前端层 · 任何机器可访问]
+        UI[Web 面板<br/>任务创建 / 结果查看 / 日志流]
+    end
+    subgraph BE[后端层 · Ubuntu 主机]
+        API[API 服务 FastAPI<br/>任务注册表 / 鉴权 / WebSocket 日志流]
+        AGENT[Agent 核心 DSH headless<br/>预设 + 科研工具插件<br/>沙箱 / 审批 / 预算账本 / 审计]
+        API --> AGENT
+    end
+    UI -->|REST + WebSocket · Bearer token| API
 ```
 
 **外卖平台类比**：前端面板是**点餐 App**，后端 API 是**平台服务器**，Agent 核心是**商家厨房**。App 永远不直接进厨房（前端不碰 Agent）——所有下单、状态、出餐都经过平台；厨房可以换（换预设/换模型），App 不用改。**分离的本质是“谁跟谁说话”的约定（契约表），而不是代码在哪个目录**。
@@ -36,27 +29,24 @@
 
 ### 一次科研任务的完整时序（先看这张图，再看 4.1~4.9 的实现）
 
-```text
-前端面板            后端 API              Agent 核心（DSH）          数据/审计
-   │                    │                      │                      │
-   │ POST /api/tasks    │                      │                      │
-   │───────────────────▶│                      │                      │
-   │                    │ 校验+落盘任务索引     │                      │ data/tasks/index.json
-   │                    │ spawn dsh --profile P│                      │
-   │                    │─────────────────────▶│                      │
-   │                    │                      │ 文献调研→实验→分析    │
-   │                    │                      │ (工具调用全量日志)    │ data/tasks/{id}.log
-   │                    │                      │ 产出结构化 JSON       │
-   │                    │◀─── 进程退出 ────────│                      │
-   │                    │ 提取 JSON→结果落盘   │                      │ data/results/{id}.json
-   │                    │ 记账（预算账本）      │                      │ data/ledger.json
-   │ WS 日志流          │                      │                      │
-   │◀───────────────────│                      │                      │
-   │ GET /result        │                      │                      │
-   │───────────────────▶│── 读取结果 JSON ────▶│                      │
-   │◀─ 彩色渲染结果 ────│                      │                      │
-└───────────────────────────────────────────────────────────────────────────────┘
-全程可审计：任何一步都有日志/结果/账本可查；评测在 CI 定期回归整条链路
+```mermaid
+sequenceDiagram
+    participant F as 前端面板
+    participant B as 后端 API
+    participant A as Agent 核心 DSH
+    participant D as 数据 / 审计
+    F->>B: POST /api/tasks（Bearer 鉴权）
+    B->>D: 校验 + 落盘任务索引 data/tasks/index.json
+    B->>A: spawn dsh --profile P 任务
+    A->>D: 工具调用全量日志 data/tasks/{id}.log
+    Note over A: 文献调研 → 实验 → 分析（结构化 JSON 产出）
+    A-->>B: 进程退出
+    B->>D: 提取 JSON → data/results/{id}.json
+    B->>D: 记账 data/ledger.json
+    B-->>F: WebSocket 日志流
+    F->>B: GET /api/tasks/{id}/result
+    B-->>F: 结构化结果（严重度彩色渲染）
+    Note over D: 全程可审计：日志 / 结果 / 账本；评测在 CI 定期回归
 ```
 
 ## 4.1 立项：为什么"非目标"清单最重要

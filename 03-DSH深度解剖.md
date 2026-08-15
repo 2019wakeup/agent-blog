@@ -152,16 +152,27 @@ DSH 把插件行分成两个平面——**这是理解整个项目的第一把�
 - 注册表、沙箱、审批 → 宿主（平台，全局唯一）；
 - 工具行、提示词 → 预设（租户，每会话不同）。
 
-```text
-┌─────────────── 进程 ───────────────────────────────┐
-│ 宿主组合（base + web）                              │
-│   tools 注册表 │ fs 策略 │ 沙箱 │ 审批 │ 持久化     │
-│   ▲            ▲        ▲                          │
-│   │挂载         │挂载     │                          │
-│ 标准预设 ──────┴─────────┴── 会话 A（native 呈现）  │
-│ PTC 预设 ──────────────── 会话 B（code 呈现）      │
-│ 极简预设 ──────────────── 会话 C（双工具）          │
-└─────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph PROC[进程]
+        subgraph HOST[宿主组合 base + web]
+            H1[工具注册表]
+            H2[fs 策略 / 沙箱 / 审批]
+            H3[持久化 / 模型路由]
+        end
+        subgraph PA[标准预设 → 会话 A]
+            A1[native 呈现 + 标准工具集]
+        end
+        subgraph PB[PTC 预设 → 会话 B]
+            B1[code 呈现 + SDK 工具集]
+        end
+        subgraph PC[极简预设 → 会话 C]
+            C1[双工具]
+        end
+    end
+    HOST -. 挂载 .-> PA
+    HOST -. 挂载 .-> PB
+    HOST -. 挂载 .-> PC
 ```
 
 > 一个预设同时被多个会话命名时，通过 scope parentage（作用域父子关系）共享工具行，但每个会话的状态（对话历史、token 计量）按 Session/Agent 独立键控。
@@ -314,13 +325,12 @@ collapses(name, scope, nested) {
 - **模型直连**其他工具 → `nested=false` → 塌缩 → `UNKNOWN_TOOL`（在预执行、审批、guard 之前就拦截），错误消息指回正确用法；
 - **程序内子调用** `await tools.read(...)` → 携带外层 `parent` token → `nested=true` → 豁免。
 
-```text
-模型（不可直接调 read/grep/bash…）
-   │ 只能调 run_code
-   ▼
-run_code 程序 ── tools.read() ──▶ 子分发（携带 parent token，豁免塌缩）
-              ── tools.grep() ──▶ 子分发
-              ── tools.bash() ──▶ 子分发
+```mermaid
+flowchart LR
+    M[模型] -->|只能直接调| RC[run_code 程序]
+    RC -->|tools.read 携带 parent token 豁免| D1[子分发: 完整工具管线]
+    RC -->|tools.bash 携带 parent token 豁免| D2[子分发: 完整工具管线]
+    M -.直接调其他工具 塌缩拦截.-> X[UNKNOWN_TOOL]
 ```
 
 ### 5.3 执行运行时：一个程序 = 一个全新 Worker
@@ -384,28 +394,26 @@ render: (_args, value) => {
 
 把 5.1~5.5 的机制串成一条时间线——这是 PTC 模式“一次往返跑完多步”的全部秘密：
 
-```text
-模型                      宿主（dsh-tools）              Worker（全新线程）          工具实现
-  │                              │                              │                    │
-  │  run_code(code, desc)        │                              │                    │
-  │─────────────────────────────▶│                              │                    │
-  │                              │ type-strip（仅可擦除语法）    │                    │
-  │                              │ 失败→不开 worker，直接报错    │                    │
-  │                              │── spawn 全新 Worker ───────▶│                    │
-  │                              │      空 env/堆上限/硬终止     │                    │
-  │                              │   tools.read(...) 绑定调用    │                    │
-  │                              │◀────────────────────────────│── 完整工具管线 ────▶│
-  │                              │      (pre→guard→exec→post)   │                    │
-  │                              │   返回值只活在程序里          │                    │
-  │                              │   tools.bash(...) 绑定调用    │                    │
-  │                              │◀────────────────────────────│── 完整工具管线 ────▶│
-  │                              │      …（任意多步，一次往返）   │                    │
-  │                              │◀─── return {logs, result} ───│                    │
-  │◀─────────────────────────────│                              │                    │
-  │  只收到 console.log + return 值（中间结果永不进对话）         │                    │
-  │                              │  结算：中止并排空未完成子调用  │                    │
-└─────────────────────────────────────────────────────────────────────────────────────┘
-                    对比：native 模式下同样的 5 步 = 5 次完整往返
+```mermaid
+sequenceDiagram
+    participant M as 模型
+    participant H as 宿主 dsh-tools
+    participant W as Worker 全新线程
+    participant T as 工具实现
+    M->>H: run_code(code, description)
+    H->>H: type-strip（仅可擦除语法）
+    Note over H: 语法失败 → 不开 Worker 直接报错
+    H->>W: spawn 全新 Worker（空 env / 堆上限 / 硬终止）
+    W->>H: tools.read 绑定调用
+    H->>T: 完整工具管线（pre→guard→exec→post）
+    T-->>W: 结果（只活在程序内）
+    W->>H: tools.bash 绑定调用
+    H->>T: 完整工具管线
+    T-->>W: 结果
+    Note over W: 任意多步，一次往返
+    W-->>H: return {logs, result}
+    H-->>M: 只回传 console.log + return 值
+    Note over H: 结算：中止并排空未完成子调用
 ```
 
 **批处理类比**：native 模式像**逐行输入的命令行**（敲一行、等一行、看一行），PTC 模式像**写一个 shell 脚本一次执行**——脚本里每一步的结果只在脚本内部流转，只有最后的输出和打印会给你看。省的是“每步等待”的往返成本，代价是你要会写脚本、调试时看不到中间态。
