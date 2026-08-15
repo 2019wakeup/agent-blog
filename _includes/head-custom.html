@@ -1,7 +1,30 @@
-<!-- Mermaid 时序图/流程图渲染（cayman 主题官方扩展点） -->
-<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<!-- Mermaid 渲染：把 Jekyll 渲染的 code.language-mermaid 转成 .mermaid 元素并渲染 -->
 <script>
-  if (window.mermaid) {
-    mermaid.initialize({ startOnLoad: true, theme: 'default' });
-  }
+  (function () {
+    function convertAndRender() {
+      if (!window.mermaid) { setTimeout(convertAndRender, 200); return; }
+      try {
+        mermaid.initialize({ startOnLoad: false, theme: 'default' });
+        var blocks = document.querySelectorAll('code.language-mermaid');
+        if (!blocks.length) return;
+        var nodes = [];
+        blocks.forEach(function (code) {
+          var pre = code.closest('pre');
+          if (!pre) return;
+          var div = document.createElement('div');
+          div.className = 'mermaid';
+          div.textContent = code.textContent;
+          pre.parentNode.replaceChild(div, pre);
+          nodes.push(div);
+        });
+        mermaid.run({ nodes: nodes });
+      } catch (e) {
+        console.error('mermaid render failed:', e);
+      }
+    }
+    document.addEventListener('DOMContentLoaded', convertAndRender);
+    if (document.readyState !== 'loading') convertAndRender();
+  })();
 </script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"
+        onerror="var s=document.createElement('script');s.src='https://unpkg.com/mermaid@11/dist/mermaid.min.js';document.head.appendChild(s);"></script>
