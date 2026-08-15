@@ -171,6 +171,8 @@ DSH 把插件行分成两个平面——**这是理解整个项目的第一把�
 预设目录：`config/agent-presets/`。**读预设 = 读 Agent 的"能力面"**。四个预设的配置差异本身就是最好的架构教材。
 
 ### 4.1 预设的"骨架"长什么样（标准模式）
+{% raw %}
+（注：下面的 {{model}}/{{cwd}} 是 DSH 模板变量，此处用 raw 标签保护，避免被 Jekyll 当 Liquid 求值）
 
 ```yaml
 # standard/agent.cordis.yml（节选，真实内容）
@@ -199,6 +201,7 @@ DSH 把插件行分成两个平面——**这是理解整个项目的第一把�
 # 标准模式不声明呈现模式——native 是默认值。
 # （只有 code 预设才新增 tool-presentation 并设 mode: code，见 4.3）
 ```
+{% endraw %}
 
 ### 4.2 极简模式：把"预设"压缩到极致
 
