@@ -67,6 +67,32 @@ Cordis（`@deepseek-ai/cordis`，DSH 的发行包）解决的核心问题：一�
 
 **Fiber 生命周期托管是 Cordis 最值钱的设计**：插件注册的副作用（事件监听、定时器、服务、工具）全部挂在它的 Fiber 上，dispose 时一次性回收。这让"动态装/卸能力"变安全——DSH 的创造模式能热插拔插件，全靠它。对照你的 35 行循环：你手动 append 消息、手动管理工具列表；生产级是"装了什么、卸了什么、隔离在哪"都有生命周期保证。
 
+**Cordis 官方最小示例**（完整可跑——注意 inject 声明依赖、fiber.dispose 一次性回收）：
+
+```ts
+import { Context, Service } from 'cordis'
+
+class Counter extends Service {
+  value = 0
+  constructor(ctx: Context) { super(ctx, 'counter') }
+  next() { return ++this.value }
+}
+
+const greeter = Object.assign((ctx: Context) => {
+  ctx.on('app/ready', (message) => {
+    ctx.logger.info('%s #%d', message, ctx.counter.next())
+  })
+}, { inject: ['counter'] })   // ★ 声明依赖：counter 必须已存在
+
+const root = new Context()
+await root.plugin(Counter)    // ★ 启动插件
+await root.plugin(greeter)
+root.emit('app/ready', 'started')
+await root.fiber.dispose()    // ★ 销毁：所有副作用自动清理
+```
+
+**Realm（领域）与 isolate**：普通插件系统的噩梦是"卸载插件 A 时永远不知道它注册了什么"。Cordis 的做法：所有副作用挂在 Fiber 上，dispose 一次回收。而 `isolate` 领域让同一预设的多会话互不污染（第 3 篇的餐厅类比：每桌客人的菜单独立）。
+
 ## 4. 工具注册表：契约的生产形态
 
 你在第 3 篇手写的 TOOLS 数组，DSH 的生产形态是工具注册表（`dsh-tools` 的 `ToolRuntime`）：
@@ -151,14 +177,49 @@ sequenceDiagram
 | 规划（第 6 篇） | plan mode：先只读探索 → 计划 → exit_plan_mode 提交审批 → 才允许实现 | 覆盖 Review 闸门一环 |
 | 安全（第 9 篇展开） | 三层：文件策略（如 workspace-write）/ 命令沙箱 / 审批栈（**拒绝即终局**：不得换方式绕过——防权限试探） | 事件流支撑审计 |
 
-## 8. 动手实验（读源码不如跑起来）
+## 8. 四个内置预设：读真实配置学架构
+
+预设目录：`config/agent-presets/`。四个预设的配置差异本身就是最好的架构教材。
+
+| 预设 | 一句话 | 差异核心 |
+|---|---|---|
+| 标准模式 | 功能完整的编码 Agent | 标准工具集 + 计划/目标/压缩/子代理/工作流 |
+| **PTC 模式** | 标准能力 + Code Mode SDK | 只差 `tool-presentation` 一行 `mode: code` |
+| 极简模式 | 只有持久 bash + str_replace_editor | persona `complete: true`（锁死提示词）+ 无压缩 |
+| 创造模式 | 能"改装自己"的预设 | 自引用 Cordis 工具集（cordis_inspect/define/run/stop/undefine） |
+
+**极简模式的真实配置揭示了两个技巧**：
+
+```yaml
+# minimal/agent.cordis.yml（节选，真实内容）
+- id: persona
+  name: '@deepseek-ai/dsh-persona'
+  config:
+    text: You are a helpful software engineer assistant.
+    complete: true                 # ★ 完整提示词：别人不能再加
+    includeRuntimeContext: false   # ★ 不带运行时上下文快照
+```
+
+**创造模式**（cordis 预设）= 标准模式 + 自引用工具集。官方 TRUST 警告（原文）："Treat a session on this preset as shell access"——**创造模式 = shell 权限**，能在运行时定义/启动/停止插件，用于"让 Agent 造另一个 Agent"。
+
+> 安全警告：不要在不可信环境开启创造模式。
+
+## 9. 动手实验（读源码不如跑起来）
+
+1. **观察"中间结果不进上下文"**：PTC 会话里一个程序同时 read/grep/bash 多个文件，只 return 摘要——对话里只有你的 return 值；
+2. **观察 UNKNOWN_TOOL 塌缩**：PTC 会话里直接调 bash（不经 run_code）——失败信息指回"只能调 run_code"；
+3. **对比四个预设**：标准/PTC/极简/创造对同一任务各跑一遍，看能力面的差异；
+4. **用 cordis_inspect 看运行时**：创造模式会话里调 `cordis_inspect`——当前进程的所有服务、存活 fiber、已注册工具——"一切皆插件"的活体解剖；
+5. **读预设猜差异**：对比 standard 与 code 的 agent.cordis.yml——差异就是 `tool-presentation` 一行 `mode: code`。
+
+## 10. 动手实验清单（读源码不如跑起来）
 
 1. **观察"中间结果不进上下文"**：PTC 会话里一个程序同时 read/grep/bash 多个文件，只 return 摘要——对话里只有你的 return 值；
 2. **观察 UNKNOWN_TOOL 塌缩**：PTC 会话里直接调 bash（不经 run_code）——失败信息指回"只能调 run_code"；
 3. **对照四个预设**：标准/PTC/极简/创造对同一任务各跑一遍，看能力面的差异；
 4. **读预设猜差异**：对比 standard 与 code 的 agent.cordis.yml——差异就是 tool-presentation 一行 `mode: code`。
 
-## 9. 检验：读完本篇，你能回答吗
+## 11. 检验：读完本篇，你能回答吗
 
 1. 9 块积木 ↔ DSH 组件各对应什么？（任举 5 个）
 2. 双平面怎么分？为什么预设里的服务必须放 isolate 领域？
@@ -166,6 +227,8 @@ sequenceDiagram
 4. PTC 的"塌缩"机制：模型直连工具为什么被拒？SDK 内子调用为什么豁免？
 5. 为什么 worker 隔离是"containment 而非 security boundary"？
 6. 标准 → PTC 的预设差异具体是哪一行？
+7. 极简模式的 complete: true 是什么意思？创造模式为什么等于 shell 权限？
+8. Cordis 的 Fiber dispose 解决什么问题？isolate 领域防什么？
 
 ## 本章小结
 

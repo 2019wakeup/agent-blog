@@ -87,6 +87,16 @@ writeFileSync(logPath, Buffer.concat(chunks).toString('utf8'))
 
 **资源治理**（科研场景的硬约束）：预算账本（data/ledger.json，跨天滚动）+ 四重熔断（实验数/时长/磁盘/GPU 显存）——先列事故清单再设计防线。
 
+**AutoResearcher 的三个核心工具**（完整代码在 `../autoresearcher/plugin/`）：
+
+| 工具 | 参数契约（模型能传） | 输出契约（模型能拿到） |
+|---|---|---|
+| `arxiv_search` | query（检索词）+ maxResults（1-50） | papers[]（title/authors/summary/link/published）+ total |
+| `literature_survey` | query + maxPapers（1-10） | papers[]（含 localPath/pages/excerpt）+ total |
+| `run_experiment` | script（白名单相对路径）+ args + timeoutSec | exitCode/tail/logPath/timedOut |
+
+> 工具测试哲学：**测边界，不测主路径**（空输入、超大输入、超时、路径逃逸、网络失败）——模型会以你意想不到的方式调用工具，边界行为就是真实行为（第 3 篇 §2 的落地）。
+
 ## 5. 安全与治理：先列事故清单，再设计防线
 
 | 事故 | 防线 |
@@ -99,6 +109,21 @@ writeFileSync(logPath, Buffer.concat(chunks).toString('utf8'))
 | 出事说不清 | 审计：工具调用全量落盘 + 实验日志全量留存 |
 
 **"拒绝即终局"为什么重要**：如果允许"换个方式重试"，模型可以无限试探权限边界——这正是提示词注入攻击的核心手法。终局语义把试探成本变成零收益。
+
+**沙箱配置（科研场景最小权限，键名为示意，DSH 真实机制=宿主平面策略+审批）**：
+
+```yaml
+# .dsh/cordis.patch.yml（示意）
+sandbox:
+  filesystem:
+    allow: [ "data/**" ]                              # 只写结果与实验输出
+    deny:  [ "**/.ssh/**", "**/.aws/**", "**/.env" ]  # 凭据目录禁读
+  command:
+    allowScripts: [ "data/scripts/**" ]               # bash 只跑白名单
+    denyPatterns: [ "rm -rf", "mkfs", "dd if=" ]      # 高危命令拦截
+```
+
+> 注意：最强控制仍是不给工具（§3 预设）；沙箱是第二道防线；审批是最后一道闸（拒绝即终局）。
 
 ## 6. 可观测性与成本
 
@@ -128,6 +153,28 @@ writeFileSync(logPath, Buffer.concat(chunks).toString('utf8'))
 跑批核心逻辑一句话：**通过率 ≥ 90% 且预算合规才 exit 0**。
 
 **为什么"模型升级必须跑评测"**：模型供应商静默升级后，同一提示词的输出分布会变——可能悄悄变笨。评测是唯一能察觉"悄悄变笨"的机制。这是 2026 年生产 Agent 团队踩坑最多的点。
+
+**评测集管理四条规范**：版本化（fixture 不可变）、防饱和（模型升级后定期加新样例）、进 CI（预设/工具/提示词/模型改动必须跑）、双指标（正确性 × 成本同时门禁）。
+
+**评测跑批的三个辅助函数**（manifest 驱动的基础设施）：
+
+```mjs
+// 1. 从输出中提取 JSON（第一个 { 到最后一个 }）
+function extractReportJson(out) {
+  const s = out.indexOf('{'), e = out.lastIndexOf('}')
+  if (s < 0 || e <= s) return {}
+  try { return JSON.parse(out.slice(s, e + 1)) } catch { return {} }
+}
+// 2. 简化 JSONPath（支持 $.a.b 与 $.arr[0].x）
+function jsonPath(obj, path) {
+  return path.replace(/^\.?\$\.?/, '').split('.').reduce((acc, key) => {
+    const m = key.match(/^(\w+)\[(\d+)\]$/)
+    return m ? acc?.[m[1]]?.[Number(m[2])] : acc?.[key]
+  }, obj)
+}
+// 3. 三种 grader：json-path（mustExist/mustMatch/mustEqual）、count（min）、regex
+function grade(g, report) { /* ...见工程代码... */ }
+```
 
 ## 8. CI/CD 与 Ubuntu 部署
 
