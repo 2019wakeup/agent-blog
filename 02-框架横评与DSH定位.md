@@ -95,6 +95,46 @@ MCP Server 的能力 = 你授予 Agent 的能力。**接一个恶意的 MCP Serv
 
 > DSH 自带 `dsh-mcp-client`：组合里声明 Server，工具自动进入 Agent 目录——"写一次 Server，处处复用"（评审 Agent、客服 Agent、运维 Agent 共享同一批 MCP Server）。
 
+### 4.4 从协议到工程：MCP 管理器与 Skills
+
+> 本节整合自 Tritium《Build An Agent From Scratch》[5.3] 篇（CC BY-NC-SA，https://www.tritium.work）。
+
+协议之外还有两个工程问题：**工具生态不该由项目自己无限维护**（每接一个系统就在仓库里写 schema/鉴权/调用逻辑，Agent runtime 会越来越臃肿）；**“怎么做一类任务”的经验也不该全部写死进 system prompt**（每类任务的 SOP 会让 prompt 越来越长）。
+
+MCP 与 Skills 正好互补：**MCP 扩展 Agent 的“手”（外部系统接口），Skills 扩展 Agent 的“做事方法”（任务 SOP）**。
+
+#### Skills：渐进披露的任务 SOP
+
+Skill 是一个带 frontmatter 的 Markdown 文件（SKILL.md），描述某类任务的详细流程：
+
+```text
+---
+name: repo-review
+description: Review a repository change for bugs and missing tests.
+---
+
+Read the diff, prioritize concrete risks, and report findings first.
+```
+
+三个关键设计：
+
+1. **description 是必填的**——模型一开始只看到技能索引（名称+描述），靠描述判断是否匹配当前任务，没有描述就没有可发现入口；
+2. **渐进披露**：系统提示词里只注入技能索引（轻量），模型判断需要时再**主动加载全文**——避免让模型每轮背着一堆当前用不到的 SOP；
+3. **隐藏隐式调用**：某些 skill 不希望模型自动调用（如安全审计流程），可用 frontmatter 的 disable-model-invocation 标记。
+
+> DSH 的 skills 机制（第 3 篇提及）就是同一思想：SKILL.md 按需加载，避免提示词膨胀。
+
+#### MCP 管理器：外部工具进入运行时
+
+接入 MCP 的工程要点（对应 DSH 的 dsh-mcp-client）：
+
+- **管理器**启动 stdio MCP server，发现其工具并映射为内部 AgentTool（统一 schema 与执行接口）；
+- **工具过滤**：enabledTools / disabledTools 控制暴露范围——不是发现什么就暴露什么；
+- **诊断不炸循环**：server 启动失败、工具调用失败都转换成可读错误进上下文，而不是让 Agent 崩溃；
+- **权限联动**：MCP 工具同样进入 read / write / execute 分级治理——外部工具不豁免安全策略。
+
+> “与时代接轨不是追热点”：MCP 和 Skills 之所以重要，是因为它们正好落在 Harness 的边界上——一个扩展“可发现的能力”，一个扩展“可复用的方法”，都让 Agent 系统在不变的循环结构上获得新的能力来源。
+
 ## 5. 基础设施（入门就要有意识）
 
 | 类 | 代表 | 一句话 |

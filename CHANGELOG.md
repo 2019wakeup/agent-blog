@@ -166,6 +166,27 @@
 
 
 
+
+
+
+
+## 整合轮 4（Tritium 系列）：第 2 篇 MCP/Skills + 第 3 篇 plan mode 对照
+- 第 2 篇 §4.4：MCP vs Skills 分工（手 vs 做事方法）、Skills 渐进披露与 SKILL.md frontmatter、MCP 管理器工程要点（过滤/诊断不炸循环/权限联动）（[5.3] 篇）
+- 第 3 篇：plan mode 小节新增与 Tritium Planner 状态机的对照（Review 闸门 vs 完整四环 + Final Answer Guard）
+- 检查器全绿
+## 整合轮 3（Tritium 系列）：第 1 篇补齐 Planner 与工具规范
+- §4.5 Planner 状态机：三失败模式（漂移/假完成/重复劳动）、计划=状态机而非文字、Plan→Review→Solve→Replan、Final Answer Guard、四层模型分工（[5] 篇）
+- §3.4 工具与 Provider 工程规范：offset/limit、timeout 杀进程树、truncation 第一道防线、Provider 边界（[2.5] 篇）
+- 检验问题扩充至 12 题；检查器全绿
+## 整合轮 2（Tritium 系列）：第 1 篇扩充上下文引擎与记忆系统
+- §5.6 上下文引擎六层：历史与视图分离（事实记录 vs 工作视图）、Prompt Builder/Token 估算/Budget Manager/启发式压缩/Handoff Summary/Dynamic Compression（[3] 篇）
+- §5.7 记忆系统三层：短期/中期（Workspace 五种笔记）/长期（Memory Store）、记忆工具三原则（读写分离/可解释/不喧宾夺主）、与 Context Engine 分工（[4] 篇）
+- 检验问题扩充至 10 题；检查器全绿
+## 整合轮 1（Tritium 系列）：第 1 篇扩充 Harness 理论框架
+- 来源：Tritium《Build An Agent From Scratch》[1][2]（CC BY-NC-SA，https://www.tritium.work，已标注）
+- §6.1 五扩展点：流式共用 loop/并行顺序写回/错误进循环/事件先行/配置隔离（[2] 篇）
+- §8 Harness 全景：马具类比、9 模块×4 层次全景表、四机制、缓存友好分层表、五条设计原则（[1] 篇）
+- 检验问题扩充至 8 题；检查器全绿
 ## 打磨轮 6：字符画图 → Mermaid（真实渲染）
 - 6 处字符画图全部替换为 Mermaid：2 张 sequenceDiagram（run_code 全链路 / 科研任务时序）+ 4 张 flowchart（Agent 循环 / 双平面 / 塌缩豁免 / 三层架构）
 - 语法验证：mermaid.ink 真实渲染 6/6 通过（注意：需 base64url 编码，标准 base64 含 / 会 404）

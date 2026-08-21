@@ -83,6 +83,7 @@
 4. 建自己的评测集，持续迭代
 
 ## 配套资源
+- **Tritium《Build An Agent From Scratch》系列**：<https://www.tritium.work>（CC BY-NC-SA；本系列第 1、2、3 篇的 Harness/上下文引擎/记忆/规划/MCP+Skills 章节整合自该系列，均标注来源）
 
 - **DSH 官方仓库**：<https://github.com/deepseek-ai/dsh>
 - **Cordis 框架**：npm 包 `cordis`

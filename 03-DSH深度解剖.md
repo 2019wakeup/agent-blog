@@ -475,6 +475,9 @@ DSH 的每次工具调用、每个子分发（`tool/code-dispatch`）、每次�
 
 **企业价值**：高风险变更（改架构、动配置）先评审后执行，防止模型"自作主张"。
 
+
+> **对照 Tritium《Build An Agent From Scratch》[5] 篇**（CC BY-NC-SA，https://www.tritium.work）：生产级 Planner 的完整形态是把计划做成**状态机**——Plan（创建显式计划）→ Review（审批闸门，计划未批准不能动手）→ Solve（每轮推进当前步骤、按证据更新状态）→ Replan（计划不成立时显式修改），外加 **Final Answer Guard**（计划未完成时阻止模型提前收尾）。DSH 的 plan mode 覆盖了其中“Review 闸门”这一环（先探索、后审批、再实现）；Tritium 系列展示完整四环——两者合起来看，就是 Plan-and-Solve 从思想到工程的全貌。
+
 ### 8.2 目标（Goal）——长任务的可靠性
 
 `goal` 工具 + 服务：持久化的长任务目标，跨轮次自动续跑（`max_goal_rounds` 封顶，本轮即"目标轮次"模式），支持 edit/pause/resume/blocked/complete 状态机。
